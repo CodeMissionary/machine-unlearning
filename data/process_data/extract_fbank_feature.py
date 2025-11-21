@@ -113,10 +113,7 @@ def extract(upstream, featurizer, dataloader, folder_path, device):
 
 
 if __name__ == "__main__":
-    if (torch.cuda.is_available()):
-        device = "cuda:5"
-    else:
-        device = "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     print(device)
     DATA_ROOT = '/home/osa/Mic_8000'
     train_path = '../train_meta_data_streaming4train_step20sec.json'

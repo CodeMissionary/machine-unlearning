@@ -12,7 +12,7 @@ import math
 import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
-from s3prl.utility.helper import hack_isinstance
+from utility.helper import (hack_isinstance)
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.metrics import confusion_matrix, f1_score, accuracy_score
@@ -401,10 +401,7 @@ if __name__ == "__main__":
     epochs = 10
     seed_value = 42
     setup_seed(seed_value)
-    if (torch.cuda.is_available()):
-        device = "cuda:5"
-    else:
-        device = "cpu"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
     print(device)
     num_lays = 6
     class_num = 2
