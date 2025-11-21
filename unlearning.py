@@ -99,7 +99,7 @@ if __name__ == "__main__":
     data = 9
     seed_value = 42
     setup_seed(seed_value)
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
     num_lays = 6
     class_num = 2
