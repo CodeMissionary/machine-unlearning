@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 """Network related utility tools."""
+
 import logging
 from typing import Dict
 
@@ -160,9 +161,9 @@ def make_pad_mask(lengths, xs=None, length_dim=-1, maxlen=None):
         )
 
     if (
-            (xs is None or xs.dim() in (2, 3))
-            and length_dim <= 2
-            and (not isinstance(lengths, list) and lengths.dim() == 1)
+        (xs is None or xs.dim() in (2, 3))
+        and length_dim <= 2
+        and (not isinstance(lengths, list) and lengths.dim() == 1)
     ):
 
         return _make_pad_mask_traceable(lengths, xs, length_dim, maxlen)
@@ -193,7 +194,7 @@ def _make_pad_mask(lengths, xs=None, length_dim=-1, maxlen=None):
 
     if xs is not None:
         assert (
-                xs.size(0) == bs
+            xs.size(0) == bs
         ), f"The size of x.size(0) {xs.size(0)} must match the batch size {bs}"
 
         if length_dim < 0:
@@ -494,9 +495,9 @@ def get_subsample(train_args, mode, arch):
         return subsample
 
     elif (
-            (mode == "asr" and arch in ("rnn", "rnn-t"))
-            or (mode == "mt" and arch == "rnn")
-            or (mode == "st" and arch == "rnn")
+        (mode == "asr" and arch in ("rnn", "rnn-t"))
+        or (mode == "mt" and arch == "rnn")
+        or (mode == "st" and arch == "rnn")
     ):
         subsample = np.ones(train_args.elayers + 1, dtype=np.int64)
         if train_args.etype.endswith("p") and not train_args.etype.startswith("vgg"):
@@ -518,7 +519,7 @@ def get_subsample(train_args, mode, arch):
         if train_args.etype.endswith("p") and not train_args.etype.startswith("vgg"):
             ss = train_args.subsample.split("_")
             for j in range(
-                    min(train_args.elayers_sd + train_args.elayers + 1, len(ss))
+                min(train_args.elayers_sd + train_args.elayers + 1, len(ss))
             ):
                 subsample[j] = int(ss[j])
         else:
@@ -554,7 +555,7 @@ def get_subsample(train_args, mode, arch):
 
 
 def rename_state_dict(
-        old_prefix: str, new_prefix: str, state_dict: Dict[str, torch.Tensor]
+    old_prefix: str, new_prefix: str, state_dict: Dict[str, torch.Tensor]
 ):
     """Replace keys of old prefix with new prefix in state dict."""
     # need this list not to break the dict iterator

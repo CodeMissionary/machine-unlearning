@@ -1,17 +1,26 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
 from torch.utils.data import Dataset, DataLoader
-import numpy
+import numpy as np
 from torch.nn import functional as F
 from torch.optim.lr_scheduler import StepLR, ExponentialLR
 import sys
 import seaborn as sns
 import random
+from sklearn.metrics import accuracy_score, f1_score  # ← 新增
+
 from utils import *
 from ebranchformer import *
 from data.process_data.extract_fbank_feature import *
-from metric.memershipattack import *
 from torch.nn.utils.rnn import pad_sequence
+
+import os
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_ROOT = os.path.join(BASE_DIR, "data", "all_data")
+TRAIN_SPLIT_DIR = os.path.join(DATA_ROOT, "train_split_by_patient")
+VAL_DIR = os.path.join(DATA_ROOT, "validation")
+TEST_DIR = os.path.join(DATA_ROOT, "test")
 
 
 def setup_seed(seed):
@@ -56,7 +65,7 @@ def evaluate(model, dataloader, weights, class_num, device):
 def blindspot_unlearner(model, random_model, train_forget_dataloader, forget_dataloader,
                         retain_dataloader,
                         test_dataloader, epochs, optimizer, weights, class_num, bestsavename, lastname, device):
-    result_array = numpy.empty((0, 3))
+    result_array = np.empty((0, 3))
     _, accretain, _ = evaluate(model, retain_dataloader, weights, class_num, device)
     _, accfor, _ = evaluate(model, forget_dataloader, weights, class_num, device)
     _, acctest, _ = evaluate(model, test_dataloader, weights, class_num, device)
@@ -99,10 +108,7 @@ if __name__ == "__main__":
     data = 9
     seed_value = 42
     setup_seed(seed_value)
-    if (torch.cuda.is_available()):
-        device = "cuda:5"
-    else:
-        device = "cpu"
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(device)
     num_lays = 6
     class_num = 2
@@ -112,16 +118,23 @@ if __name__ == "__main__":
         weights = torch.FloatTensor([0.20, 0.50, 0.30])
     elif class_num == 5:
         weights = torch.FloatTensor([0.05, 0.15, 0.10, 0.50, 0.20])
-    train_path = '/home/osa/all_data/all_data/train_split_by_patient'
-    val_path = '/home/osa/all_data/all_data/validation'
-    test_path = '/home/osa/all_data/all_data/test'
+    train_path = TRAIN_SPLIT_DIR
+    val_path = VAL_DIR
+    test_path = TEST_DIR
 
     val_dataset = PSGDataset(val_path)
     test_dataset = PSGDataset(test_path)
     train_dataset = TrainAllDataset(train_path)
 
-    patients_np = np.load('./data/process_data/patient_ids.npy')
-    forget_patients_np = np.load('./data/process_data/forget_patients.npy')
+    # 不再用原项目里的 npy，而是直接从真实存在的病人目录里取 ID
+    patients_np = np.array(
+        sorted(
+            d for d in os.listdir(train_path)
+            if os.path.isdir(os.path.join(train_path, d))
+        )
+    )
+    # 暂时把所有病人都当成“候选遗忘病人”
+    forget_patients_np = patients_np.copy()
 
     test_dataloader = DataLoader(test_dataset, batch_size=256, shuffle=False, drop_last=False, collate_fn=collate_fn)
     lr_all = 4e-5
@@ -132,7 +145,7 @@ if __name__ == "__main__":
                                             num_blocks=num_lays,
                                             cgmlp_linear_units=256, linear_units=256).to(device)
     random_model.eval()
-    amodel.load_state_dict(torch.load('./log1/class2_pre_e10_b128_sloss1_1_adapter1_best.pth', map_location=device))
+    amodel.load_state_dict(torch.load("./log1/class2_pre_e10_b128_sloss1_1_adapter3_best.pth", map_location=device))
 
     for param in amodel.parameters():
         param.requires_grad = False
@@ -142,17 +155,20 @@ if __name__ == "__main__":
         for param in adapter_params:
             param.requires_grad = True
 
-    bestsavename = './log1/forget/class2_pre_e10_b128_sloss1_1_adapter1_best_data{}_batch{}_lr{}.pth'.format(data,
-                                                                                                             batch_size,
-                                                                                                             lr_all)
-    lastname = './log1/forget/class2_pre_e10_b128_sloss1_1_adapter1_last_data{}_batch{}_lr{}.pth'.format(data,
-                                                                                                         batch_size,
-                                                                                                         lr_all)
+    bestsavename = "./log1/class2_pre_e10_b128_sloss1_1_adapter3_best.pth".format(data, batch_size, lr_all)
+    lastname = "./log1/class2_pre_e10_b128_sloss1_1_adapter3_best.pth".format(data, batch_size, lr_all)
     optimizer = torch.optim.Adam(filter(lambda p: p.requires_grad, amodel.parameters()), lr=lr_all)
 
-    specified_idx = forget_patients_np[data]
-    print(specified_idx)
+    # 如果没有任何病人，那就直接报错
+    if len(forget_patients_np) == 0:
+        raise RuntimeError(f"No patients found in {train_path}")
+
+    # 用 data 对长度取模，保证索引在范围内（你现在只有一个病人就是下标 0）
+    specified_idx = forget_patients_np[data % len(forget_patients_np)]
+    print("forget patient:", specified_idx)
+
     forget_path = os.path.join(train_path, specified_idx)
+
     forget_dataset = PSGDataset(forget_path)
     sampler = get_balanced_sampler(forget_dataset)
     train_forget_dataloader = DataLoader(forget_dataset, batch_size=batch_size, sampler=sampler, drop_last=False,
